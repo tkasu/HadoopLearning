@@ -1,4 +1,4 @@
-import max_temperature.MaxTemperatureReducer;
+import ncdc_analysis.map_reduce.temperature.MaxTemperatureReducer;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mrunit.mapreduce.ReduceDriver;

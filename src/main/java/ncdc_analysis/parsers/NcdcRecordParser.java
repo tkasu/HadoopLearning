@@ -1,4 +1,4 @@
-package max_temperature;
+package ncdc_analysis.parsers;
 
 import org.apache.hadoop.io.Text;
 

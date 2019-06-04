@@ -1,5 +1,6 @@
-package max_temperature;
+package ncdc_analysis.map_reduce.temperature;
 
+import ncdc_analysis.parsers.NcdcRecordParser;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;

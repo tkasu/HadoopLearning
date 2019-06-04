@@ -1,4 +1,4 @@
-import max_temperature.MaxTemperatureMapper;
+import ncdc_analysis.map_reduce.temperature.MaxTemperatureMapper;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;

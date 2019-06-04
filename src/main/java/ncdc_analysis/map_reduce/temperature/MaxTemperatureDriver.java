@@ -1,4 +1,4 @@
-package max_temperature;
+package ncdc_analysis.map_reduce.temperature;
 
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
@@ -10,7 +10,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
-public class MaxTemperatureNestedFoldersDriver extends Configured implements Tool {
+public class MaxTemperatureDriver extends Configured implements Tool {
 
     @Override
     public int run(String[] args) throws Exception {
@@ -21,7 +21,7 @@ public class MaxTemperatureNestedFoldersDriver extends Configured implements Too
             return -1;
         }
 
-        Job job = Job.getInstance(getConf(), "Max temperature");
+        Job job = Job.getInstance(getConf(), "Max ncdc_analysis.map_reduce.temperature");
         job.setJarByClass(getClass());
 
         FileInputFormat.addInputPath(job, new Path(args[0]));
@@ -39,7 +39,7 @@ public class MaxTemperatureNestedFoldersDriver extends Configured implements Too
     }
 
     public static void main(String[] args) throws Exception {
-        int exitCode = ToolRunner.run(new MaxTemperatureNestedFoldersDriver(), args);
+        int exitCode = ToolRunner.run(new MaxTemperatureDriver(), args);
         System.exit(exitCode);
     }
 }

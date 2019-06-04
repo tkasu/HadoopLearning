@@ -1,4 +1,4 @@
-import max_temperature.MaxTemperatureDriver;
+import ncdc_analysis.map_reduce.temperature.MaxTemperatureDriver;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
