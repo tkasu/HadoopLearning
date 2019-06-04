@@ -1,0 +1,20 @@
+# Intellij
+.idea/
+*.iml
+*.iws
+.classpath
+.project
+.settings/
+
+# Mac
+.DS_Store
+
+# Maven
+log/
+target/
+
+# Hadoop output
+output/
+
+# ncdc data (see scripts/redownload-ncdc-data)
+input.nosync/ftp.ncdc.noaa.gov
