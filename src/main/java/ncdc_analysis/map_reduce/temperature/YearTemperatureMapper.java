@@ -8,7 +8,7 @@ import org.apache.hadoop.mapreduce.Mapper;
 
 import java.io.IOException;
 
-public class MaxTemperatureMapper
+public class YearTemperatureMapper
         extends Mapper<LongWritable, Text, Text, IntWritable> {
 
     private NcdcRecordParser parser = new NcdcRecordParser();

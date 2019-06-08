@@ -10,7 +10,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
-public class MaxTemperatureDriver extends Configured implements Tool {
+public class TemperatureStatsDriver extends Configured implements Tool {
 
     @Override
     public int run(String[] args) throws Exception {
@@ -21,7 +21,7 @@ public class MaxTemperatureDriver extends Configured implements Tool {
             return -1;
         }
 
-        Job job = Job.getInstance(getConf(), "Max ncdc_analysis.map_reduce.temperature");
+        Job job = Job.getInstance(getConf(), "Temperature Statistics ncdc_analysis.map_reduce.temperature");
         job.setJarByClass(getClass());
 
         FileInputFormat.addInputPath(job, new Path(args[0]));
@@ -29,17 +29,18 @@ public class MaxTemperatureDriver extends Configured implements Tool {
         FileOutputFormat.setOutputPath(job, new Path(args[1]));
 
         job.setMapperClass(YearTemperatureMapper.class);
-        job.setCombinerClass(MaxTemperatureReducer.class);
-        job.setReducerClass(MaxTemperatureReducer.class);
+        job.setReducerClass(TemperatureStatsReducer.class);
 
+        job.setMapOutputKeyClass(Text.class);
+        job.setMapOutputValueClass(IntWritable.class);
         job.setOutputKeyClass(Text.class);
-        job.setOutputValueClass(IntWritable.class);
+        job.setOutputValueClass(TemperatureStatsReducer.StatsWriteable.class);
 
         return job.waitForCompletion(true) ? 0 : 1;
     }
 
     public static void main(String[] args) throws Exception {
-        int exitCode = ToolRunner.run(new MaxTemperatureDriver(), args);
+        int exitCode = ToolRunner.run(new TemperatureStatsDriver(), args);
         System.exit(exitCode);
     }
 }

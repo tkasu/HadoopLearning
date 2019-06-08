@@ -1,4 +1,4 @@
-import ncdc_analysis.map_reduce.temperature.MaxTemperatureMapper;
+import ncdc_analysis.map_reduce.temperature.YearTemperatureMapper;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
@@ -7,7 +7,7 @@ import org.junit.*;
 
 import java.io.IOException;
 
-public class MaxTemperatureMapperTest {
+public class YearTemperatureMapperTest {
 
     @Test
     public void processesValidRecord() throws IOException, InterruptedException {
@@ -16,7 +16,7 @@ public class MaxTemperatureMapperTest {
                                       "99999V0203201N00261220001CN9999999N9-00111+99999999999");
                                                              // Temperature ^^^^^
         new MapDriver<LongWritable, Text, Text, IntWritable>()
-                .withMapper(new MaxTemperatureMapper())
+                .withMapper(new YearTemperatureMapper())
                 .withInput(new LongWritable(0), value)
                 .withOutput(new Text("1950"), new IntWritable(-11))
                 .runTest();
@@ -30,7 +30,7 @@ public class MaxTemperatureMapperTest {
                                       "99999V0203201N00261220001CN9999999N9+99991+99999999999");
                                                    // Temperature ^^^^^
         new MapDriver<LongWritable, Text, Text, IntWritable>()
-                .withMapper(new MaxTemperatureMapper())
+                .withMapper(new YearTemperatureMapper())
                 .withInput(new LongWritable(0), value)
                 .runTest();
     }

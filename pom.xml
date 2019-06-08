@@ -66,7 +66,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>ncdc_analysis.map_reduce.temperature.MaxTemperatureDriver</mainClass>
+                            <mainClass>ncdc_analysis.map_reduce.temperature.TemperatureStatsDriver</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
