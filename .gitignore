@@ -29,6 +29,9 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
+# Local env variables
+.env
+
 # Hadoop output
 output/
 
