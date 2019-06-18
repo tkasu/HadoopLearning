@@ -1,7 +1,6 @@
 package ncdc_analysis.spark.temperature;
 
 import ncdc_analysis.parsers.NcdcRecordParser;
-import org.apache.spark.SparkConf;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -34,13 +33,13 @@ public class MaxTemperatureApp {
 
         Dataset<Row> resultDf =
             spark.sql("SELECT " +
-                              "  year, max(temperature) as max_temp " +
-                              "FROM " +
-                              "  ncdc_temperature " +
-                              "GROUP BY " +
-                              "  year " +
-                              "ORDER BY" +
-                              "  year");
+                      "  year, max(temperature) as max_temp " +
+                      "FROM " +
+                      "  ncdc_temperature " +
+                      "GROUP BY " +
+                      "  year " +
+                      "ORDER BY" +
+                      "  year");
 
         resultDf.repartition(1)
                 .write().format("com.databricks.spark.csv")
