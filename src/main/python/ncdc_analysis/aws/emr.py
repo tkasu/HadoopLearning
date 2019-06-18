@@ -1,7 +1,7 @@
 import boto3
 from datetime import datetime
 import os
-from ncdc_analysis.aws.s3 import fetch_mapreduce_results
+from ncdc_analysis.aws.s3 import fetch_mapreduce_results, S3Path
 import pandas as pd
 from settings import AWS_REGION, NCDC_LOGS_S3_OUT_PATH, NCDC_S3_JAR_PATH, NCDC_S3_LOGS_PATH, \
     NCDC_S3_DATA_PROD_PATH, NCDC_S3_DATA_TEST_PATH, LOCAL_OUTPUT_PATH
@@ -78,7 +78,7 @@ def run_job(instance_count: int, instance_type: str, mode: Optional[str] = None,
 
     cluster_id = cluster["JobFlowId"]
     wait_for_cluster_completion(client, cluster_id)
-    result_df: pd.DataFrame = fetch_mapreduce_results(output_bucket, val_col_names=val_col_names)
+    result_df: pd.DataFrame = fetch_mapreduce_results(S3Path.from_path(output_bucket), val_col_names=val_col_names)
     result_df.to_csv(os.path.join(LOCAL_OUTPUT_PATH, f"{run_timestamp}_ncdc_emr_results.csv"))
 
 
