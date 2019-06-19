@@ -46,7 +46,7 @@ def test_s3_listdir():
     keys = s3_listdir(s3_client, path_obj)
 
     assert isinstance(keys, list)
-    assert set(map(lambda d: d["Key"], keys)) == {"my/ls/test/key_1", "my/ls/test/key_2"}
+    assert {d["Key"] for d in keys} == {"my/ls/test/key_1", "my/ls/test/key_2"}
 
 
 @mock_s3
