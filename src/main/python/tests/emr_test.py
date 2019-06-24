@@ -12,15 +12,32 @@ def emr_client():
 
 
 @pytest.fixture()
-def emr_config():
+def emr_mapr_config():
     config = create_emr_config(1, "m4.large", "s3://some-bucket/logs", "s3://some-bukcet/jars/some.jar",
                                "s3://some-bucket/data", "s3://some-bucket/results")
     return config
 
 
+@pytest.fixture()
+def emr_spark_config():
+    config = create_emr_config(1, "m4.large", "s3://some-bucket/logs", "s3://some-bukcet/jars/some.jar",
+                               "s3://some-bucket/data", "s3://some-bucket/results",
+                               spark=True, spark_class="some.fancy.spark.class")
+    return config
+
+
 @mock_emr
-def test_emr_job_send(emr_client, emr_config):
-    cluster_id = send_job_to_emr(emr_client, emr_config)
+def test_emr_mapr_job_send(emr_client, emr_mapr_config):
+    cluster_id = send_job_to_emr(emr_client, emr_mapr_config)
+
+    steps = emr_client.list_steps(ClusterId=cluster_id)["Steps"]
+    statuses = [step["Status"]["State"] for step in steps]
+    assert "STARTING" in statuses
+
+
+@mock_emr
+def test_emr_spark_job_send(emr_client, emr_spark_config):
+    cluster_id = send_job_to_emr(emr_client, emr_spark_config)
 
     steps = emr_client.list_steps(ClusterId=cluster_id)["Steps"]
     statuses = [step["Status"]["State"] for step in steps]

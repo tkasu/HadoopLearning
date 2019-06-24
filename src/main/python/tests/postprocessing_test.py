@@ -1,6 +1,7 @@
 import pandas as pd
 import pytest
 from ncdc_analysis.postprocessing.map_reduce_utils import clean_mapr_results
+from ncdc_analysis.postprocessing.spark_utils import clean_spark_results
 
 
 def test_mapr_clean_str():
@@ -32,4 +33,13 @@ def test_mapr_clean_no_col_names():
                                                                  1: ["val_b", "val_e"],
                                                                  2: ["val_c", "val_f"]})
     test_result = clean_mapr_results(test_mapr_data)
+    assert test_result.equals(expected_result)
+
+
+def test_spark_results():
+    test_data = "col_1,col_2,col_3\nval_a,val_b,val_c\nval_d,val_e,val_f"
+    expected_result = pd.DataFrame(data={"col_1": ["val_a", "val_d"],
+                                         "col_2": ["val_b", "val_e"],
+                                         "col_3": ["val_c", "val_f"]})
+    test_result = clean_spark_results(test_data)
     assert test_result.equals(expected_result)
