@@ -1,11 +1,7 @@
 from dataclasses import dataclass
-import boto3
 import os
 from urllib.parse import urlparse
-import pandas as pd
-from typing import Tuple, List, Dict, Optional, Union
-from ncdc_analysis.postprocessing.map_reduce_utils import clean_mapr_results
-from ncdc_analysis.postprocessing.spark_utils import clean_spark_results
+from typing import Tuple, List, Dict
 
 
 @dataclass
@@ -36,7 +32,8 @@ class S3Path:
 
 
 def s3_listdir(s3_client, path: S3Path) -> List[Dict]:
-    """'ls' for s3 bucket, returns results in List"""
+    """'ls' for s3 bucket, returns results in List
+    TODO refactor to be S3Path methods."""
     objects_response = s3_client.list_objects_v2(Bucket=path.bucket, Prefix=path.key)
     if objects_response["KeyCount"] == 0:
         return []
@@ -47,37 +44,8 @@ def s3_listdir(s3_client, path: S3Path) -> List[Dict]:
 
 
 def s3_read_to_mem(s3_client, path: S3Path, encoding="utf-8"):
-    """Download s3 key to memory."""
+    """Download s3 key to memory
+    TODO TODO refactor to be S3Path methods."""
     file_obj = s3_client.get_object(Bucket=path.bucket, Key=path.key)
     data = file_obj["Body"].read().decode(encoding)
     return data
-
-
-def fetch_hadoop_style_results(path: S3Path, col_names: Union[bool, Optional[List[str]]],
-                               spark: bool = False) -> pd.DataFrame:
-    """Fetches and cleans MapReduce formatted results from given s3-path.
-    col_names behaves as following:
-      True == column names in the first row
-      None == generates int column names from index 0
-      List[str] == Uses these as column names"""
-    session = boto3.Session(profile_name="default")
-    s3 = session.client("s3")
-
-    keys = s3_listdir(s3, path)
-    if not keys:
-        raise ValueError(f"No files in in following S3-path: {path.path}")
-
-    key_names: List[str] = map(lambda d: d["Key"], keys)
-    raw_data: List[str] = []
-    result_prefix: S3Path = path.join("part-")
-    for key_name in key_names:
-        if key_name.startswith(result_prefix.key):
-            key_full_path: S3Path = S3Path(bucket=path.bucket, key=key_name)
-            data = s3_read_to_mem(s3, key_full_path)
-            raw_data.append(data)
-
-    if spark:
-        results: pd.DataFrame = clean_spark_results(raw_data)
-    else:
-        results: pd.DataFrame = clean_mapr_results(raw_data, col_names=col_names)
-    return results

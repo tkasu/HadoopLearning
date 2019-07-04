@@ -1,7 +1,9 @@
 import boto3
 from dataclasses import dataclass
-from ncdc_analysis.aws.emr import EMRConfigBuilder, EMRStep, EMRHadoopStep, EMRSparkStep, send_job_to_emr
-from moto import mock_emr, mock_s3
+from ncdc_analysis.aws.emr import EMRConfigBuilder, EMRStep, EMRHadoopStep, EMRSparkStep, EMRRunner
+from ncdc_analysis.aws.s3 import S3Path
+from ncdc_analysis.postprocessing.result_fetchers import EMRResultCsvFetcher
+from moto import mock_emr
 from typing import Dict
 import pytest
 
@@ -264,19 +266,40 @@ class TestEMRConfig:
         assert apps == {"Hadoop", "Hive", "Pig"}
 
 
-@mock_emr
-def test_emr_mapr_job_send(emr_client, emr_mapr_config):
-    cluster_id = send_job_to_emr(emr_client, emr_mapr_config)
+class TestEMRRunner:
 
-    steps = emr_client.list_steps(ClusterId=cluster_id)["Steps"]
-    statuses = [step["Status"]["State"] for step in steps]
-    assert "STARTING" in statuses
+    @pytest.fixture()
+    def emr_test_config(self):
+        config = EMRConfigBuilder(name="Test EMR Run",
+                                  instance_count=1,
+                                  instance_type="m5.large",
+                                  logs_path="s3://some-bucket/logs",
+                                  action_on_failure="TERMINATE")
+        step = EMRHadoopStep(jar_path="s3://my/jar/path",
+                             jar_args=["s3://my/input", "s3://my/output"],
+                             action_on_failure="TERMINATE")
+        config.add_step(step)
+        return config
 
+    def test_init(self, emr_test_config: EMRConfigBuilder):
+        output_path = S3Path.from_path("s3://my/output")
+        runner = EMRRunner(config=emr_test_config, output_path=output_path, max_wait=3600)
+        assert runner.config == emr_test_config
+        assert runner.max_wait == 3600
+        assert runner.wait_for_completion
+        assert runner.output_path == output_path
 
-@mock_emr
-def test_emr_spark_job_send(emr_client, emr_spark_config):
-    cluster_id = send_job_to_emr(emr_client, emr_spark_config)
+    def test_init_no_wait(self, emr_test_config: EMRConfigBuilder):
+        output_path = S3Path.from_path("s3://my/output")
+        runner = EMRRunner(config=emr_test_config, output_path=output_path, max_wait=3600, wait_for_completion=False)
+        assert not runner.wait_for_completion
 
-    steps = emr_client.list_steps(ClusterId=cluster_id)["Steps"]
-    statuses = [step["Status"]["State"] for step in steps]
-    assert "STARTING" in statuses
+    def test_default_wait(self, emr_test_config: EMRConfigBuilder):
+        output_path = S3Path.from_path("s3://my/output")
+        runner = EMRRunner(config=emr_test_config, output_path=output_path)
+        assert runner.max_wait == 900
+
+    def test_value_fetcher(self, emr_test_config: EMRConfigBuilder):
+        output_path = S3Path.from_path("s3://my/output")
+        runner = EMRRunner(config=emr_test_config, output_path=output_path, result_fetcher=EMRResultCsvFetcher)
+        assert runner.result_fetcher == EMRResultCsvFetcher

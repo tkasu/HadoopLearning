@@ -1,14 +1,12 @@
 from abc import abstractmethod, ABCMeta
 import boto3
 from dataclasses import dataclass, field
-from datetime import datetime
 from itertools import chain
-import os
-from ncdc_analysis.aws.s3 import fetch_hadoop_style_results, S3Path
-import pandas as pd
-from settings import AWS_REGION, NCDC_S3_OUT_PATH, NCDC_S3_JAR_PATH, NCDC_S3_LOGS_PATH, \
-    NCDC_S3_DATA_PROD_PATH, NCDC_S3_DATA_TEST_PATH, LOCAL_OUTPUT_PATH
-from typing import Dict, Optional, List
+import math
+from ncdc_analysis.aws.s3 import S3Path
+from ncdc_analysis.postprocessing.result_fetchers import EMRResultFetcher
+from settings import AWS_REGION
+from typing import Any, Dict, Optional, List
 
 
 @dataclass
@@ -136,100 +134,69 @@ class EMRConfigBuilder:
         return {**self._build_config_base(), **self._build_config_applications(), **self._build_config_steps()}
 
 
-def wait_for_cluster_completion(client, cluster_id: str) -> None:
-    """Blocks until all EMR Steps has been completed.
-    Cheks results every 30 seconds, fails after 60 tries."""
-    steps = client.list_steps(ClusterId=cluster_id)["Steps"]
+class EMRRunner:
+    config: EMRConfigBuilder
+    result_fetcher: EMRResultFetcher
+    output_path: S3Path
+    results: Optional[Any] = None
+    max_wait: int
+    wait_for_completion: bool
+    _client = None
+    _cluster_id: Optional[str]
 
-    waiter = client.get_waiter("step_complete")
-    print("Waiting until EMR job has been completed")
-    for step in steps:
-        print(f"Waiting for EMR-step {step['Name']}")
-        waiter.wait(
-            ClusterId=cluster_id,
-            StepId=step["Id"],
-            WaiterConfig={
-                "Delay": 30,
-                "MaxAttempts": 60
-            }
-        )
-    print("EMR Job completed!")
+    def __init__(self, config, output_path: S3Path, result_fetcher=None, max_wait=900, wait_for_completion=True):
+        self.config = config
+        self.output_path = output_path
+        self.result_fetcher = result_fetcher
+        self.max_wait = max_wait
+        self.wait_for_completion = wait_for_completion
+        self._init_emr_session()
 
+    def execute(self):
+        self._send_job_to_emr()
+        if not self.wait_for_completion:
+            print("Job sent to EMR.")
+            return
+        self._wait_for_cluster_completion()
+        if self.result_fetcher:
+            self.fetch_results()
+            print("Results fetched")
 
-def send_job_to_emr(emr_client, emr_config: EMRConfigBuilder) -> str:
-    """Send job to AWS EMR. Returns cluster identification that can be used to request more details with boto3"""
-    cluster: Dict = emr_client.run_job_flow(**emr_config.to_dict())
-    cluster_id = cluster["JobFlowId"]
-    return cluster_id
+    def fetch_results(self):
+        self.results = self.result_fetcher.fetch(self.output_path)
 
+    def _send_job_to_emr(self):
+        """Send job to AWS EMR. Returns cluster identification that can be used to request more details with boto3"""
+        cluster: Dict = self._client.run_job_flow(**self.config.to_dict())
+        cluster_id = cluster["JobFlowId"]
+        self._cluster_id = cluster_id
 
-def run_mapr_job(instance_count: int, instance_type: str, mode: Optional[str] = None, val_col_names: Optional[List[str]] = None):
-    """Run MapReduce job in EMR.
-    Waits until the cluster has been terminated and saves the results to LOCAL_OUTPUT_PATH in .csv"""
-    if not mode or mode == "test":
-        input_data_path = NCDC_S3_DATA_TEST_PATH
-    elif mode == "prod":
-        input_data_path = NCDC_S3_DATA_PROD_PATH
-    else:
-        raise ValueError("Invalid run mode, valid values are 'test' and 'prod")
+    def _init_emr_session(self):
+        session = boto3.Session(profile_name="default")
+        client = session.client("emr", region_name=AWS_REGION)
+        self._client = client
 
-    run_timestamp: str = datetime.now().isoformat()
-    output_path = os.path.join(NCDC_S3_OUT_PATH, run_timestamp)
-    jar_path = os.path.join(NCDC_S3_JAR_PATH, "hadoop-learning-0.1-shaded.jar")
+    def _wait_for_cluster_completion(self) -> None:
+        """Blocks until all EMR Steps has been completed.
+        Max wait is approximately equivalent to self.max_wait in seconds, rounded up to next 30s."""
+        client = self._client
+        cluster_id = self._cluster_id
 
-    emr_config = EMRConfigBuilder(name="MapReduce Job",
-                                  instance_count=instance_count,
-                                  instance_type=instance_type,
-                                  logs_path=NCDC_S3_LOGS_PATH)
-    step = EMRHadoopStep(jar_path=jar_path, jar_args=[input_data_path, output_path])
-    emr_config.add_step(step)
+        steps = client.list_steps(ClusterId=cluster_id)["Steps"]
 
-    # Credentials from /.aws/credentials
-    # TODO make a specific profile for this application
-    session = boto3.Session(profile_name="default")
-    client = session.client("emr", region_name=AWS_REGION)
-    cluster_id = send_job_to_emr(client, emr_config)
+        waiter = client.get_waiter("step_complete")
+        print("Waiting until EMR job has been completed")
+        delay = 30
+        max_attempts = math.ceil(self.max_wait / delay)
+        for step in steps:
+            print(f"Waiting for EMR-step {step['Name']}")
+            waiter.wait(
+                ClusterId=cluster_id,
+                StepId=step["Id"],
+                WaiterConfig={
+                    "Delay": delay,
+                    "MaxAttempts": max_attempts
+                }
+            )
+        print("EMR Job completed!")
 
-    wait_for_cluster_completion(client, cluster_id)
-    result_df: pd.DataFrame = fetch_hadoop_style_results(S3Path.from_path(output_path), col_names=val_col_names)
-    result_df.to_csv(os.path.join(LOCAL_OUTPUT_PATH, f"{run_timestamp}_ncdc_emr_results.csv"))
-
-
-def run_spark_job(instance_count: int, instance_type: str, jar_class: str, packages: Optional[List[str]], mode: Optional[str] = None):
-    """Run Spark job in EMR."""
-    if not mode or mode == "test":
-        input_data_path = NCDC_S3_DATA_TEST_PATH
-    elif mode == "prod":
-        input_data_path = NCDC_S3_DATA_PROD_PATH
-    else:
-        raise ValueError("Invalid run mode, valid values are 'test' and 'prod")
-
-    run_timestamp: str = datetime.now().isoformat()
-    output_path = os.path.join(NCDC_S3_OUT_PATH, run_timestamp)
-    jar_path = os.path.join(NCDC_S3_JAR_PATH, "hadoop-learning-0.1-shaded.jar")
-
-    emr_config = EMRConfigBuilder(name="Spark Job",
-                                  instance_count=instance_count,
-                                  instance_type=instance_type,
-                                  logs_path=NCDC_S3_LOGS_PATH)
-    step = EMRSparkStep(jar_path=jar_path, jar_args=[input_data_path, output_path],
-                        jar_class=jar_class,
-                        packages=packages)
-    emr_config.add_step(step)
-
-    session = boto3.Session(profile_name="default")
-    client = session.client("emr", region_name=AWS_REGION)
-    cluster_id = send_job_to_emr(client, emr_config)
-
-    wait_for_cluster_completion(client, cluster_id)
-    result_df: pd.DataFrame = fetch_hadoop_style_results(S3Path.from_path(output_path),
-                                                         spark=True, col_names=True)
-    result_df.to_csv(os.path.join(LOCAL_OUTPUT_PATH, f"{run_timestamp}_ncdc_emr_results.csv"))
-
-
-if __name__ == "__main__":
-    #run_mapr_job(1, "m4.large", val_col_names=["min", "max", "average", "count"])
-    run_spark_job(5, "m5.xlarge",
-                  jar_class="ncdc_analysis.spark.temperature.MaxTemperatureApp",
-                  packages=["com.databricks:spark-csv_2.11:1.5.0"],
-                  mode="prod")
