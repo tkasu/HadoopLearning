@@ -1,7 +1,8 @@
 from abc import abstractmethod, ABCMeta
 import boto3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
+from itertools import chain
 import os
 from ncdc_analysis.aws.s3 import fetch_hadoop_style_results, S3Path
 import pandas as pd
@@ -13,7 +14,7 @@ from typing import Dict, Optional, List
 @dataclass
 class EMRStep(metaclass=ABCMeta):
     """Helper Abstract class to create steps for EMRConfigBuilder"""
-    pass
+    # required_emr_applications: List[str]
 
     @abstractmethod
     def to_dict(self) -> Dict:
@@ -23,10 +24,13 @@ class EMRStep(metaclass=ABCMeta):
 
 @dataclass
 class EMRHadoopStep(EMRStep):
-    action_on_failure: str
     jar_path: str
     jar_args: List[str]
-    name: str
+    name: str = "Hadoop Jar Step"
+    action_on_failure: str = "CONTINUE"
+
+    # Class args
+    required_emr_applications: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict:
         d = {
@@ -42,15 +46,18 @@ class EMRHadoopStep(EMRStep):
 
 @dataclass
 class EMRSparkStep(EMRStep):
-    action_on_failure: str
     jar_path: str
     jar_class: str
     jar_args: List[str]
-    packages: List[str]
-    name: str
+    packages: List[str] = field(default_factory=list)
+    name: str = "Spark Jar Step"
+    action_on_failure: str = "CONTINUE"
+
+    # Class args
     _args_defaults = ["spark-submit",
                       "--deploy-mode", "cluster",
                       "--master", "yarn"]
+    required_emr_applications = ["Spark"]
 
     def _build_packages(self) -> List:
         return ["--packages", ",".join(self.packages)] if self.packages else []
@@ -87,34 +94,10 @@ class EMRConfigBuilder:
         self.instance_type = instance_type
         self.logs_path = logs_path
         self.action_on_failure = action_on_failure
-        self._spark = False
         self._steps = []
 
-    def add_hadoop_step(self,
-                        jar_path: str,
-                        jar_args: List[str],
-                        action_on_failure: Optional[str] = "CONTINUE",
-                        name: Optional[str] = "Hadoop Jar Step"):
-        """Adds basic Hadoop JAR-step, tested with MapReduce jobs."""
-        step = EMRHadoopStep(name=name, action_on_failure=action_on_failure,
-                             jar_path=jar_path, jar_args=jar_args)
+    def add_step(self, step: EMRStep):
         self._steps.append(step)
-
-    def add_spark_step(self,
-                       jar_path: str,
-                       jar_args: List[str],
-                       jar_class: str,
-                       packages: Optional[List[str]] = None,
-                       action_on_failure: Optional[str] = "CONTINUE",
-                       name: Optional[str] = "Spark Jar Step"):
-        """Adds Spark-step.
-        Also signals for EMRConfigBuilder that Spark should be added as a Application-keyword to the config."""
-        if not packages:
-            packages = []
-        step = EMRSparkStep(name=name, jar_path=jar_path, jar_args=jar_args, jar_class=jar_class,
-                            packages=packages, action_on_failure=action_on_failure)
-        self._steps.append(step)
-        self._spark = True
 
     def _build_config_base(self) -> Dict:
         d = dict(
@@ -137,7 +120,12 @@ class EMRConfigBuilder:
         return dict(Steps=steps)
 
     def _build_config_applications(self) -> Dict:
-        return dict(Applications=[{"Name": "Spark"}]) if self._spark else {}
+        steps_app_reqs = [step.required_emr_applications for step in self._steps]
+        app_reqs = list(set(chain.from_iterable(steps_app_reqs)))
+        if not app_reqs:
+            return {}
+        app_reqs_dicts = [{"Name": req} for req in app_reqs]
+        return dict(Applications=app_reqs_dicts)
 
     def to_dict(self) -> Dict:
         """Creates dictionary that can be passed to boto3.
@@ -193,7 +181,8 @@ def run_mapr_job(instance_count: int, instance_type: str, mode: Optional[str] = 
                                   instance_count=instance_count,
                                   instance_type=instance_type,
                                   logs_path=NCDC_S3_LOGS_PATH)
-    emr_config.add_hadoop_step(jar_path=jar_path, jar_args=[input_data_path, output_path])
+    step = EMRHadoopStep(jar_path=jar_path, jar_args=[input_data_path, output_path])
+    emr_config.add_step(step)
 
     # Credentials from /.aws/credentials
     # TODO make a specific profile for this application
@@ -223,9 +212,10 @@ def run_spark_job(instance_count: int, instance_type: str, jar_class: str, packa
                                   instance_count=instance_count,
                                   instance_type=instance_type,
                                   logs_path=NCDC_S3_LOGS_PATH)
-    emr_config.add_spark_step(jar_path=jar_path, jar_args=[input_data_path, output_path],
-                              jar_class=jar_class,
-                              packages=packages)
+    step = EMRSparkStep(jar_path=jar_path, jar_args=[input_data_path, output_path],
+                        jar_class=jar_class,
+                        packages=packages)
+    emr_config.add_step(step)
 
     session = boto3.Session(profile_name="default")
     client = session.client("emr", region_name=AWS_REGION)

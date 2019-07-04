@@ -1,5 +1,6 @@
 import boto3
-from ncdc_analysis.aws.emr import EMRConfigBuilder, send_job_to_emr
+from dataclasses import dataclass
+from ncdc_analysis.aws.emr import EMRConfigBuilder, EMRStep, EMRHadoopStep, EMRSparkStep, send_job_to_emr
 from moto import mock_emr, mock_s3
 from typing import Dict
 import pytest
@@ -17,8 +18,9 @@ def emr_mapr_config():
                               instance_count=1,
                               instance_type="m4.large",
                               logs_path="s3://some-bucket/logs")
-    config.add_hadoop_step(jar_path="s3://some-bukcet/jars/some.jar",
-                           jar_args=["s3://some-bucket/data", "s3://some-bucket/results"])
+    step = EMRHadoopStep(jar_path="s3://some-bukcet/jars/some.jar",
+                         jar_args=["s3://some-bucket/data", "s3://some-bucket/results"])
+    config.add_step(step)
     return config
 
 
@@ -28,9 +30,10 @@ def emr_spark_config():
                               instance_count=1,
                               instance_type="m4.large",
                               logs_path="s3://some-bucket/logs")
-    config.add_spark_step(jar_path="s3://some-bukcet/jars/some.jar",
-                          jar_args=["s3://some-bucket/data", "s3://some-bucket/results"],
-                          jar_class="some.fancy.spark.class")
+    step = EMRSparkStep(jar_path="s3://some-bukcet/jars/some.jar",
+                        jar_args=["s3://some-bucket/data", "s3://some-bucket/results"],
+                        jar_class="some.fancy.spark.class")
+    config.add_step(step)
     return config
 
 
@@ -65,45 +68,45 @@ class TestEMRConfig:
 
         assert config.action_on_failure == "CONTINUE"
 
-    def test_no_spark_by_default(self, emr_default_config):
-        assert emr_default_config._spark == False
-
     def test_hadoop_step(self, emr_default_config):
         config = emr_default_config
-        config.add_hadoop_step(name="My custom step",
-                               jar_path="s3://my/jar/path",
-                               jar_args=["s3://my/input", "s3://my/output"],
-                               action_on_failure="TERMINATE")
+        step = EMRHadoopStep(name="My custom step",
+                             jar_path="s3://my/jar/path",
+                             jar_args=["s3://my/input", "s3://my/output"],
+                             action_on_failure="TERMINATE")
+        config.add_step(step)
         jar_step = config._steps[0]
         assert jar_step.name == "My custom step"
         assert jar_step.action_on_failure == "TERMINATE"
         assert jar_step.jar_path == "s3://my/jar/path"
         assert jar_step.jar_args == ["s3://my/input", "s3://my/output"]
-        assert config._spark == False
 
     def test_hadoop_step_no_name(self, emr_default_config):
         config = emr_default_config
-        config.add_hadoop_step(jar_path="s3://my/jar/path",
-                               jar_args=["s3://my/input", "s3://my/output"],
-                               action_on_failure="TERMINATE")
+        step = EMRHadoopStep(jar_path="s3://my/jar/path",
+                             jar_args=["s3://my/input", "s3://my/output"],
+                             action_on_failure="TERMINATE")
+        config.add_step(step)
         jar_step = config._steps[0]
         assert jar_step.name == "Hadoop Jar Step"
 
     def test_hadoop_step_no_action_on_failure(self, emr_default_config):
         config = emr_default_config
-        config.add_hadoop_step(jar_path="s3://my/jar/path",
-                               jar_args=["s3://my/input", "s3://my/output"])
+        step = EMRHadoopStep(jar_path="s3://my/jar/path",
+                             jar_args=["s3://my/input", "s3://my/output"])
+        config.add_step(step)
         jar_step = config._steps[0]
         assert jar_step.action_on_failure == "CONTINUE"
 
     def test_spark_step(self, emr_default_config):
         config = emr_default_config
-        config.add_spark_step(name="My custom step",
-                              jar_path="s3://my/jar/path",
-                              jar_class="MySparkApp",
-                              jar_args=["s3://my/input", "s3://my/output"],
-                              packages=["com.databricks:spark-csv_2.11:1.5.0", "io.delta:delta-core_2.12:0.1.0"],
-                              action_on_failure="TERMINATE")
+        step = EMRSparkStep(name="My custom step",
+                            jar_path="s3://my/jar/path",
+                            jar_class="MySparkApp",
+                            jar_args=["s3://my/input", "s3://my/output"],
+                            packages=["com.databricks:spark-csv_2.11:1.5.0", "io.delta:delta-core_2.12:0.1.0"],
+                            action_on_failure="TERMINATE")
+        config.add_step(step)
         jar_step = config._steps[0]
         assert jar_step.name == "My custom step"
         assert jar_step.action_on_failure == "TERMINATE"
@@ -111,14 +114,14 @@ class TestEMRConfig:
         assert jar_step.jar_args == ["s3://my/input", "s3://my/output"]
         assert jar_step.jar_class == "MySparkApp"
         assert jar_step.packages == ["com.databricks:spark-csv_2.11:1.5.0", "io.delta:delta-core_2.12:0.1.0"]
-        assert config._spark == True
 
     def test_to_dict_hadoop_step(self, emr_default_config):
         config = emr_default_config
-        config.add_hadoop_step(name="My custom step",
-                               jar_path="s3://my/jar/path",
-                               jar_args=["s3://my/input", "s3://my/output"],
-                               action_on_failure="TERMINATE")
+        step = EMRHadoopStep(name="My custom step",
+                             jar_path="s3://my/jar/path",
+                             jar_args=["s3://my/input", "s3://my/output"],
+                             action_on_failure="TERMINATE")
+        config.add_step(step)
         config_dict: Dict = config.to_dict()
         expected_dict = dict(
             Name=self.default_name,
@@ -147,12 +150,13 @@ class TestEMRConfig:
 
     def test_to_dict_spark_step(self, emr_default_config):
         config = emr_default_config
-        config.add_spark_step(name="My custom step",
-                              jar_path="s3://my/jar/path",
-                              jar_class="MySparkApp",
-                              jar_args=["s3://my/input", "s3://my/output"],
-                              packages=["com.databricks:spark-csv_2.11:1.5.0", "io.delta:delta-core_2.12:0.1.0"],
-                              action_on_failure="TERMINATE")
+        step = EMRSparkStep(name="My custom step",
+                            jar_path="s3://my/jar/path",
+                            jar_class="MySparkApp",
+                            jar_args=["s3://my/input", "s3://my/output"],
+                            packages=["com.databricks:spark-csv_2.11:1.5.0", "io.delta:delta-core_2.12:0.1.0"],
+                            action_on_failure="TERMINATE")
+        config.add_step(step)
         config_dict: Dict = config.to_dict()
         expected_dict = dict(
             Name=self.default_name,
@@ -194,11 +198,12 @@ class TestEMRConfig:
 
     def test_spark_to_dict_no_packages(self, emr_default_config):
         config = emr_default_config
-        config.add_spark_step(name="My custom step",
-                              jar_path="s3://my/jar/path",
-                              jar_class="MySparkApp",
-                              jar_args=["s3://my/input", "s3://my/output"],
-                              action_on_failure="TERMINATE")
+        step = EMRSparkStep(name="My custom step",
+                            jar_path="s3://my/jar/path",
+                            jar_class="MySparkApp",
+                            jar_args=["s3://my/input", "s3://my/output"],
+                            action_on_failure="TERMINATE")
+        config.add_step(step)
         config_dict: Dict = config.to_dict()
         expected_dict = dict(
             Name=self.default_name,
@@ -230,6 +235,33 @@ class TestEMRConfig:
             ]
         )
         assert config_dict == expected_dict
+
+    def test_multiple_app_reqs(self, emr_default_config):
+        config = emr_default_config
+
+        @dataclass
+        class DummyHiveStep(EMRStep):
+            required_emr_applications = ["Hadoop", "Hive"]
+
+            def to_dict(self):
+                return {"Name": "DummyHiveStep"}
+
+        @dataclass
+        class DummyPigStep(EMRStep):
+            required_emr_applications = ["Pig", "Hadoop"]
+
+            def to_dict(self):
+                return {"Name": "DummyPigStep"}
+
+        dummy_hive_step = DummyHiveStep()
+        dummy_pig_step = DummyPigStep()
+
+        config.add_step(dummy_hive_step)
+        config.add_step(dummy_pig_step)
+
+        config_dict: Dict = config.to_dict()
+        apps = {app_dict["Name"] for app_dict in config_dict["Applications"]}
+        assert apps == {"Hadoop", "Hive", "Pig"}
 
 
 @mock_emr
