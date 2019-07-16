@@ -1,3 +1,3 @@
 #!/bin/bash
 
-aws s3 cp ./input.nosync/ftp.ncdc.noaa.gov/pub/data/noaa/*  s3://hadoopbook-tomi/ncdc --recursive
+aws s3 cp ../input.nosync/ncdc_processed/yearly/gz/all $NCDC_LOGS_S3_DATA_PROD_PATH --recursive
