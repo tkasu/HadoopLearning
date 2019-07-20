@@ -53,7 +53,7 @@ By default, python scripts try to load enviroment variables from .env file from 
 This project uses maven and can be packaged with:
 
 ```bash
-mvn package
+$ mvn package
 ```
 
 Note that if you want to use to Python EMR cluster_runner, you have to manually create S3 bucket and upload the .jar, see e.g. scripts/compile-and-send-to-s3.sh
@@ -67,8 +67,8 @@ Needed libraries can be found from py_environment.yml and can be installed and a
 
 ```bash
 # Modify prefix in py_environemnet.yml to match you anaconda installation and
-conda env create -f py_environment.yml
-conda activate hadoop-learning
+$ conda env create -f py_environment.yml
+$ conda activate hadoop-learning
 ```
 
 ### Hadoop
@@ -103,14 +103,14 @@ You need at least one S3-bucket set up and configured to environment variables t
 ### Java
 
 ```bash
-mvn test
+$ mvn test
 ```
 
 ### Python
 
 ```bash
-conda activate hadoop-learning
-pytest
+$ conda activate hadoop-learning
+$ pytest
 ```
 
 ## Data acquisition
@@ -130,9 +130,9 @@ Dataset is gz-packaged fixed width files, and I downloaded them with FTP from ft
 However, as the ftp-server has huge number of small files that do not play well with MapReduce and Spark, I made small utility to combine files to yearly:
 
 ```bash
-conda activate hadoop-learning
-cd src/main/python
-python -m ncdc_analysis.cli.file_combiner --input <input-path> --output <output-path>
+$ conda activate hadoop-learning
+$ cd src/main/python
+$ python -m ncdc_analysis.cli.file_combiner --input <input-path> --output <output-path>
 ```
 
 ### To AWS
@@ -148,7 +148,7 @@ Note that currently this project is only to be able to run job that is marked as
 #### Hadoop testing with single VM
 
 ````bash
-hadoop jar target/hadoop-learning-0.1-shaded.jar -conf conf/hadoop-local.xml <input-folder-path> <output-folder-path>
+$ hadoop jar target/hadoop-learning-0.1-shaded.jar -conf conf/hadoop-local.xml <input-folder-path> <output-folder-path>
 ````
 
 #### Hadoop pseudocluster
@@ -161,8 +161,8 @@ To run job in [pseudocluster](https://hadoop.apache.org/docs/stable/hadoop-proje
 I recommend consulting [Hadoop Book](http://hadoopbook.com/). 
 
 ```bash
-./scripts/start-hadoop.sh
-hadoop jar target/hadoop-learning-0.1-shaded.jar -conf conf/hadoop-localhost.xml <input-folder-path> <output-folder-path>
+$ ./scripts/start-hadoop.sh
+$ hadoop jar target/hadoop-learning-0.1-shaded.jar -conf conf/hadoop-localhost.xml <input-folder-path> <output-folder-path>
 ```
 
 Please note that in this case <input-folder-path> and <output-folder-path> are folders in hadoop filesystem.
@@ -243,7 +243,6 @@ Results fetched
 
 ````bash
 $ python -m ncdc_analysis.cli.cluster_runner --job-type spark --jar-class ncdc_analysis.spark.temperature.MaxTemperatureApp --packages com.databricks:spark-csv_2.11:1.5.0 --input-data test
-
 
 Waiting until EMR job has been completed
 Waiting for EMR-step Spark Jar Step
