@@ -53,30 +53,3 @@ def combine_gz_files_to_one(folder, output_file):
             with gzip.open(file, "rb") as infile:
                 outfile.write(infile.read())
     compress_existing_file(output_file, delete_old_file=True)
-
-
-def combine_files(input_folder, output_folder):
-    """Combines NCDC Weather data from year-named folders including .gz files to one .gz file for each year."""
-    folders: List[NcdcFolder] = get_ncdc_folders(input_folder)
-    for folder in folders:
-        output_file = os.path.join(output_folder, folder.year)
-        combine_gz_files_to_one(folder, output_file)
-
-
-def main():
-    """When fetching data with FTP from ftp://ftp.ncdc.noaa.gov/pub/data/noaa/ the data is splitted to small files.
-    We reprocess the files for bigger chunks to increase the performance of our analysis-stack."""
-    if len(sys.argv) == 3:
-        input_path = sys.argv[1]
-        output_path = sys.argv[2]
-        combine_files(input_path, output_path)
-    else:
-        print(f"""Script to combine small .gz files fetched from ftp://ftp.ncdc.noaa.gov/pub/data/noaa/ 
-        for large year-based files. 
-        Usage: <input_path> <output_path> 
-        Input path should be the noaa folder which includes year-named folders. Output path is the path 
-        where new year-named files will be created.""")
-
-
-if __name__ == "__main__":
-    main()

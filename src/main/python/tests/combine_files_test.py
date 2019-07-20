@@ -7,7 +7,8 @@ cur_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(cur_path)
 
 import pytest
-from ncdc_analysis.preprocessing.combine_files_to_yearly import combine_files, get_path_last_item
+from ncdc_analysis.preprocessing.combine_files_to_yearly import get_path_last_item
+from ncdc_analysis.core.combine_files import combine_files
 
 
 def test_pytest():
