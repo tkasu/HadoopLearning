@@ -8,6 +8,8 @@ import java.io.IOException;
 import java.util.Optional;
 import java.util.stream.StreamSupport;
 
+// Example is  modofied version from Hadoop: The Definete Guide http://hadoopbook.com/
+// Uses streams, original version used loops
 public class MaxTemperatureReducer
         extends Reducer<Text, IntWritable, Text, IntWritable> {
 

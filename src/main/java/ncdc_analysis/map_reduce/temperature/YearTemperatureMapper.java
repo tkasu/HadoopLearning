@@ -8,6 +8,7 @@ import org.apache.hadoop.mapreduce.Mapper;
 
 import java.io.IOException;
 
+// Example is from Hadoop: The Definete Guide http://hadoopbook.com/
 public class YearTemperatureMapper
         extends Mapper<LongWritable, Text, Text, IntWritable> {
 

@@ -32,6 +32,7 @@ public class NcdcRecordParser {
         return df;
     }
 
+    // Example is from Hadoop: The Definete Guide http://hadoopbook.com/
     public void parse(String record) {
         year = record.substring(15, 19);
         String airTemperatureString;
