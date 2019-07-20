@@ -172,7 +172,7 @@ class EMRRunner:
         self._cluster_id = cluster_id
 
     def _init_emr_session(self):
-        session = boto3.Session(profile_name="default")
+        session = boto3.Session(profile_name="emr_runner")
         client = session.client("emr", region_name=AWS_REGION)
         self._client = client
 
