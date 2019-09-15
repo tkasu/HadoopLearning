@@ -6,6 +6,7 @@ My journey to learn (and in some cases refresh) following tools and platforms:
 * AWS 
 * Spark
 * Beyond Java 6
+* Docker
 * And there will be more ;)
 
 At the beginning this was a project template to test examples in the [Hadoop Book](http://hadoopbook.com/), but this has evolved as a toy project to try different tools.
@@ -21,7 +22,7 @@ Also if using Python EMR runner, please check that the EC2 instance will termina
 
 * Java 1.8
 * Maven
-* Python Anaconda Distribution
+* Python Anaconda Distribution (or Docker)
 * Spark (to run Spark locally, can be run in cluster without this)
 * Hadoop (to run MapReduce locally, can be run in cluster without this)
 
@@ -250,6 +251,40 @@ EMR Job completed!
 Results fetched
 
 ````
+
+#### Dockerized EMR Runner
+
+You can also use Docker to use EMR Runner without installing python and required packages.
+
+You can build the docker image yourself from Dockerfile with:
+
+```bash
+docker build -t aws_cluster_runner .
+```
+
+Or pull the image from docker hub [repository](http://hadoopbook.com/)
+
+```bash
+docker pull tkasu/aws_cluster_runner
+```
+
+To run the docker image, you need to mount your aws credental folder, output folder and dotenv. The default enrtrypoint for the image is 'python -m ncdc_analysis.cli.cluster_runner'.
+
+Please see the following Spark example for reference:
+
+```bash
+$ docker run -t \
+  -v $HOME/.aws/credentials:/root/.aws/credentials:ro \
+  -v $(pwd)/output:/app/output \
+  -v $(pwd)/.env:/app/.env:ro \
+  -env_file=.env \
+  aws_cluster_runner \
+  --job-type spark \
+  --jar-class ncdc_analysis.spark.temperature.MaxTemperatureApp \
+  --packages com.databricks:spark-csv_2.11:1.5.0 \
+  --input-data test \
+  --out-local /app/output/
+```
 
 ## Authors
 

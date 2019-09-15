@@ -33,7 +33,14 @@ coverage.xml
 .env
 
 # Hadoop output
-output/
+output/*.csv
+output/*.crc
+output/.*
+output/*/.*
+output/_*
+output/*/_*
+output/part-*
+output/*/part-*
 
 # ncdc data (see scripts/redownload-ncdc-data)
 input.nosync/ftp.ncdc.noaa.gov
